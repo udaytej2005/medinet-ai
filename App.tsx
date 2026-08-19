@@ -12,7 +12,9 @@ import { BRICSFederatedHub } from './components/brics/BRICSFederatedHub';
 import { AuditLogViewer } from './components/security/AuditLogViewer';
 import { ArchitectureDoc } from './components/presentation/ArchitectureDoc';
 import { PitchSummaryModal } from './components/presentation/PitchSummaryModal';
+import { PitchDeckViewer } from './components/presentation/PitchDeckViewer';
 import { SurgeScenarioModal } from './components/presentation/SurgeScenarioModal';
+import { GeminiCopilot } from './components/gemini/GeminiCopilot';
 
 import { PHCNode } from './types/health';
 import { UserSession, UserRole, SecurityAuditRecord } from './types/security';
@@ -44,6 +46,7 @@ export function App() {
 
   // 4. Modals State
   const [isPitchOpen, setIsPitchOpen] = useState(false);
+  const [isPitchDeckOpen, setIsPitchDeckOpen] = useState(false);
   const [isSurgeModalOpen, setIsSurgeModalOpen] = useState(false);
   const [isForecastingRunning, setIsForecastingRunning] = useState(false);
   const [forecastSummary, setForecastSummary] = useState<ForecastSummary | null>(null);
@@ -181,7 +184,7 @@ export function App() {
         const newInventory = phc.inventory.map(drug => {
           if (scenario.affectedDrugCategories.includes(drug.category)) {
             const elevatedBurn = Math.round(drug.dailyBurnRate * scenario.burnRateMultiplier);
-            const burnedStock = Math.max(0, Math.round(drug.currentStock * 0.45)); // shock drain
+            const burnedStock = Math.max(0, Math.round(drug.currentStock * 0.45));
             const days = Math.round((burnedStock / (elevatedBurn || 1)) * 10) / 10;
             return {
               ...drug,
@@ -262,6 +265,7 @@ export function App() {
         onRoleChange={handleRoleChange}
         onLockKiosk={handleLockKiosk}
         onOpenPitch={() => setIsPitchOpen(true)}
+        onOpenPitchDeck={() => setIsPitchDeckOpen(true)}
         onOpenSurgeModal={() => setIsSurgeModalOpen(true)}
         phcs={phcs}
         onOpenAudit={() => setCurrentTab('security')}
@@ -280,13 +284,14 @@ export function App() {
           phcs={phcs}
           activeAlertCount={activeAlertCount}
           pendingTransferCount={pendingTransferCount}
+          onOpenPitchDeck={() => setIsPitchDeckOpen(true)}
         />
 
         {/* Dynamic Main Content Canvas */}
         <main className="flex-1 p-4 lg:p-8 overflow-y-auto max-h-[calc(100vh-65px)] space-y-6">
           
-          {/* Top KPI Metrics Overview Bar (Visible on primary tabs) */}
-          {(currentTab === 'overview' || currentTab === 'alerts' || currentTab === 'forecast' || currentTab === 'redistribution') && (
+          {/* Top KPI Metrics Overview Bar (Visible on primary operational tabs) */}
+          {(currentTab === 'overview' || currentTab === 'copilot' || currentTab === 'alerts' || currentTab === 'forecast' || currentTab === 'redistribution') && (
             <StatsOverview
               phcs={phcs}
               selectedDistrict={selectedDistrict}
@@ -296,6 +301,13 @@ export function App() {
           {/* TAB 1: GEOSPATIAL MAP & NETWORK OVERVIEW */}
           {currentTab === 'overview' && (
             <div className="space-y-6 animate-in fade-in duration-200">
+              {/* Gemini Quick Copilot Banner */}
+              <GeminiCopilot
+                selectedPHC={selectedPHC}
+                proposals={proposals}
+                onNavigateToRedistribution={() => setCurrentTab('redistribution')}
+              />
+
               <InteractiveMap
                 phcs={phcs}
                 selectedDistrict={selectedDistrict}
@@ -381,7 +393,18 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 2: EARLY WARNING SYSTEM (EWS) */}
+          {/* TAB 2: GEMINI AI COPILOT */}
+          {currentTab === 'copilot' && (
+            <div className="animate-in fade-in duration-200 space-y-6">
+              <GeminiCopilot
+                selectedPHC={selectedPHC}
+                proposals={proposals}
+                onNavigateToRedistribution={() => setCurrentTab('redistribution')}
+              />
+            </div>
+          )}
+
+          {/* TAB 3: EARLY WARNING SYSTEM (EWS) */}
           {currentTab === 'alerts' && (
             <div className="animate-in fade-in duration-200">
               <AlertCenter
@@ -393,7 +416,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 3: AI DEMAND FORECASTING */}
+          {/* TAB 4: AI DEMAND FORECASTING */}
           {currentTab === 'forecast' && (
             <div className="animate-in fade-in duration-200">
               <ForecastView
@@ -406,7 +429,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 4: INTER-PHC REDISTRIBUTION */}
+          {/* TAB 5: INTER-PHC REDISTRIBUTION */}
           {currentTab === 'redistribution' && (
             <div className="animate-in fade-in duration-200">
               <RecommenderView
@@ -418,7 +441,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 5: BRICS FEDERATED HUB */}
+          {/* TAB 6: BRICS FEDERATED HUB */}
           {currentTab === 'brics' && (
             <div className="animate-in fade-in duration-200">
               <BRICSFederatedHub
@@ -440,7 +463,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 6: SECURITY & AUDIT TRAIL */}
+          {/* TAB 7: SECURITY & AUDIT TRAIL */}
           {currentTab === 'security' && (
             <div className="animate-in fade-in duration-200">
               <AuditLogViewer
@@ -451,7 +474,7 @@ export function App() {
             </div>
           )}
 
-          {/* TAB 7: ARCHITECTURE & PRODUCTION ROADMAP */}
+          {/* TAB 8: ARCHITECTURE & PRODUCTION ROADMAP */}
           {currentTab === 'architecture' && (
             <div className="animate-in fade-in duration-200">
               <ArchitectureDoc />
@@ -471,13 +494,19 @@ export function App() {
         }}
       />
 
-      {/* MODAL 2: Pitch Deck Companion */}
+      {/* MODAL 2: Pitch Notes Modal */}
       <PitchSummaryModal
         isOpen={isPitchOpen}
         onClose={() => setIsPitchOpen(false)}
       />
 
-      {/* MODAL 3: Epidemic Surge Injector */}
+      {/* MODAL 3: 12-Slide Pitch Deck Viewer */}
+      <PitchDeckViewer
+        isOpen={isPitchDeckOpen}
+        onClose={() => setIsPitchDeckOpen(false)}
+      />
+
+      {/* MODAL 4: Epidemic Surge Injector */}
       <SurgeScenarioModal
         isOpen={isSurgeModalOpen}
         onClose={() => setIsSurgeModalOpen(false)}
@@ -485,7 +514,7 @@ export function App() {
         onResetToBaseline={handleResetBaseline}
       />
 
-      {/* MODAL 4: Kiosk Security Lock Screen */}
+      {/* MODAL 5: Kiosk Security Lock Screen */}
       <KioskLockModal
         session={session}
         onUnlock={handleUnlockKiosk}
